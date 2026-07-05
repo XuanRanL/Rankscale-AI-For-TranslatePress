@@ -1,5 +1,7 @@
 # Rankscale AI For TranslatePress
 
+**简体中文** · [English](README.en.md) · [Français](README.fr.md) · [Español](README.es.md) · [Deutsch](README.de.md)
+
 Rankscale AI For TranslatePress 是一个强大的 TranslatePress 扩展插件，为您的 WordPress 网站提供多个 AI 翻译引擎支持。通过优化的翻译提示词，有效避免了翻译中出现的异常字符和不必要的解释性文字。
 
 ## ✨ 主要特性
