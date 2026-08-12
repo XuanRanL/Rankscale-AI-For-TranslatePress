@@ -7,8 +7,8 @@ Rankscale AI For TranslatePress is a powerful TranslatePress extension that adds
 ## ✨ Key Features
 
 *   **Multi-Engine Support**:
-    *   **DeepSeek API**: High-quality translation via SiliconFlow, the official DeepSeek endpoint, or a custom endpoint (supports DeepSeek-V3.2 and deep-thinking mode).
-    *   **Google Gemini API**: Supports the latest models such as Gemini 2.5 Flash / Pro and Gemini 3 Flash, with a generous free tier.
+    *   **DeepSeek API**: High-quality translation via SiliconFlow, the official DeepSeek endpoint, or a custom endpoint (SiliconFlow defaults to DeepSeek-V3.2, the official endpoint to deepseek-v4-flash; deep-thinking mode supported).
+    *   **Google Gemini API**: Supports Gemini 3.6 Flash, Gemini 3.5 Flash-Lite, and the Gemini 2.5 series, with a generous free tier.
     *   **OpenAI (ChatGPT) API**: Supports models such as GPT-5.4 and GPT-5.2, compatible with both the Responses API and Chat Completions.
 *   **Deep-Thinking Mode**: The DeepSeek engine supports `enable_thinking`, letting the model reason before translating to improve quality. The Thinking Budget is configurable (128-32768 tokens).
 *   **Automatic Retry**: On API rate limiting (429) or temporary server failures (5xx), it automatically retries with an exponential backoff strategy to ensure translation jobs complete.
@@ -18,7 +18,8 @@ Rankscale AI For TranslatePress is a powerful TranslatePress extension that adds
     *   HTML injection protection: automatically prevents AI from introducing HTML tags into plain-text translations.
 *   **Flexible Configuration**:
     *   DeepSeek: switch between SiliconFlow / official DeepSeek / custom API endpoints.
-    *   Gemini: choose Flash (fast), Flash-Lite (cheapest), Pro (highest quality), or Gemini 3 (cutting-edge) models.
+    *   Gemini: choose Gemini 3.6 Flash (recommended), 3.5 Flash-Lite (cheapest), or the 2.5 series (legacy).
+    *   **Custom model ID**: all three engines accept a manually entered model ID — use newly released or renamed models without waiting for a plugin update.
     *   OpenAI: supports both the Responses API (recommended) and Chat Completions (compatibility) endpoints.
     *   API keys are displayed as passwords for better security.
 *   **Multisite Support**: Compatible with WordPress Multisite, including network-activated TranslatePress.
@@ -81,6 +82,15 @@ Rankscale AI For TranslatePress is a powerful TranslatePress extension that adds
 The plugin includes a built-in automatic retry mechanism. When the API returns 429 (rate limited) or 5xx (server error), it automatically waits and retries (up to 2 times), with no manual intervention needed.
 
 ## 📅 Changelog
+
+### 2.1.0
+*   **New: Custom model ID** for all three engines (DeepSeek / Gemini / OpenAI). Provider model renames (like the deepseek-chat retirement) no longer break the plugin — the root cure for stale model lists.
+*   **Fix: DeepSeek official endpoint breakage**: `deepseek-chat` was retired by DeepSeek on 2026-07-24; the official endpoint now defaults to `deepseek-v4-flash`. `enable_thinking`/`thinking_budget` are SiliconFlow-specific and are no longer sent to the official endpoint.
+*   **Fix: OpenAI GPT-5 parameter compatibility**: reasoning models (GPT-5/o-series) no longer receive `temperature` (they only accept the default of 1 and return 400 otherwise); Chat Completions now uses `max_completion_tokens` instead of the rejected `max_tokens`; output token caps are set per model family (gpt-4o-mini 16384 / gpt-4.1 32768).
+*   **Fix: Gemini sampling parameter deprecation**: removed `temperature`/`topP`/`topK` per Google's guidance (ignored since Gemini 3.5+, will return 400 in future generations).
+*   **Improved: Gemini model list**: default is now `gemini-3.6-flash`, added `gemini-3.5-flash-lite`; retired model IDs stored in old settings are automatically mapped to living replacements.
+*   **Fix: activation hook ordering**: the activation-time TranslatePress dependency check now runs even when TranslatePress is inactive.
+*   **New: `trp_ai_max_output_tokens` filter** to customize output token caps per engine/model.
 
 ### 2.0.0
 *   **Architecture refactor**: Introduced three abstract base classes - AbstractTranslationEngine, AbstractApiHelper, and AbstractRegisterEngine - removing about 1,000 lines of duplicate code.

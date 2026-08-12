@@ -7,8 +7,8 @@ Rankscale AI For TranslatePress ist eine leistungsstarke TranslatePress-Erweiter
 ## ✨ Hauptfunktionen
 
 *   **Unterstützung mehrerer Engines**:
-    *   **DeepSeek API**: hochwertige Übersetzung über SiliconFlow, den offiziellen DeepSeek-Endpunkt oder einen benutzerdefinierten Endpunkt (unterstützt DeepSeek-V3.2 und den Deep-Thinking-Modus).
-    *   **Google Gemini API**: unterstützt die neuesten Modelle wie Gemini 2.5 Flash / Pro und Gemini 3 Flash mit einem großzügigen kostenlosen Kontingent.
+    *   **DeepSeek API**: hochwertige Übersetzung über SiliconFlow, den offiziellen DeepSeek-Endpunkt oder einen benutzerdefinierten Endpunkt (SiliconFlow verwendet standardmäßig DeepSeek-V3.2, der offizielle Endpunkt deepseek-v4-flash; Deep-Thinking-Modus wird unterstützt).
+    *   **Google Gemini API**: unterstützt Gemini 3.6 Flash, Gemini 3.5 Flash-Lite und die Gemini-2.5-Serie mit einem großzügigen kostenlosen Kontingent.
     *   **OpenAI (ChatGPT) API**: unterstützt Modelle wie GPT-5.4 und GPT-5.2, kompatibel mit der Responses API und Chat Completions.
 *   **Deep-Thinking-Modus**: Die DeepSeek-Engine unterstützt `enable_thinking`, sodass das Modell vor der Übersetzung schlussfolgert, um die Qualität zu verbessern. Das Thinking Budget ist konfigurierbar (128-32768 Tokens).
 *   **Automatischer Wiederholungsversuch**: Bei API-Ratenbegrenzung (429) oder vorübergehenden Serverfehlern (5xx) wird automatisch mit einer exponentiellen Backoff-Strategie erneut versucht, damit Übersetzungsaufgaben abgeschlossen werden.
@@ -18,7 +18,8 @@ Rankscale AI For TranslatePress ist eine leistungsstarke TranslatePress-Erweiter
     *   HTML-Injection-Schutz: verhindert automatisch, dass die KI HTML-Tags in reine Textübersetzungen einfügt.
 *   **Flexible Konfiguration**:
     *   DeepSeek: Wechsel zwischen den Endpunkten SiliconFlow / offizielles DeepSeek / benutzerdefinierte API.
-    *   Gemini: Wahl zwischen den Modellen Flash (schnell), Flash-Lite (am günstigsten), Pro (höchste Qualität) oder Gemini 3 (neueste Generation).
+    *   Gemini: Wahl zwischen Gemini 3.6 Flash (empfohlen), 3.5 Flash-Lite (am günstigsten) oder der 2.5-Serie (Legacy).
+    *   **Benutzerdefinierte Modell-ID**: alle drei Engines akzeptieren eine manuell eingegebene Modell-ID — neue oder umbenannte Modelle lassen sich ohne Plugin-Update nutzen.
     *   OpenAI: unterstützt sowohl den Responses-API-Endpunkt (empfohlen) als auch den Chat-Completions-Endpunkt (Kompatibilität).
     *   API-Schlüssel werden aus Sicherheitsgründen als Passwort angezeigt.
 *   **Multisite-Unterstützung**: kompatibel mit WordPress Multisite, einschließlich netzwerkweit aktiviertem TranslatePress.
@@ -81,6 +82,15 @@ Rankscale AI For TranslatePress ist eine leistungsstarke TranslatePress-Erweiter
 Das Plugin verfügt über einen integrierten automatischen Wiederholungsmechanismus. Wenn die API 429 (Ratenbegrenzung) oder 5xx (Serverfehler) zurückgibt, wartet es und versucht es automatisch erneut (bis zu 2 Mal), ohne dass ein manuelles Eingreifen erforderlich ist.
 
 ## 📅 Änderungsprotokoll
+
+### 2.1.0
+*   **Neu: Benutzerdefinierte Modell-ID** für alle drei Engines (DeepSeek / Gemini / OpenAI). Modellumbenennungen der Anbieter (wie die Abschaltung von deepseek-chat) legen das Plugin nicht mehr lahm — die grundlegende Lösung für veraltete Modelllisten.
+*   **Fix: offizieller DeepSeek-Endpunkt**: `deepseek-chat` wurde am 24.07.2026 von DeepSeek abgeschaltet; der offizielle Endpunkt verwendet nun standardmäßig `deepseek-v4-flash`. `enable_thinking`/`thinking_budget` sind SiliconFlow-spezifisch und werden nicht mehr an den offiziellen Endpunkt gesendet.
+*   **Fix: GPT-5-Parameterkompatibilität (OpenAI)**: Reasoning-Modelle (GPT-5/o-Serie) erhalten kein `temperature` mehr (sie akzeptieren nur den Standardwert 1, sonst Fehler 400); Chat Completions verwendet jetzt `max_completion_tokens` statt des abgelehnten `max_tokens`; Ausgabe-Token-Limits pro Modellfamilie (gpt-4o-mini 16384 / gpt-4.1 32768).
+*   **Fix: veraltete Gemini-Sampling-Parameter**: `temperature`/`topP`/`topK` gemäß Googles Vorgaben entfernt (seit Gemini 3.5+ ignoriert, künftige Generationen liefern 400).
+*   **Verbesserung: Gemini-Modellliste**: Standardmodell ist jetzt `gemini-3.6-flash`, `gemini-3.5-flash-lite` hinzugefügt; in alten Einstellungen gespeicherte, abgeschaltete Modell-IDs werden automatisch ersetzt.
+*   **Fix: Reihenfolge der Aktivierungs-Hooks**: Die TranslatePress-Abhängigkeitsprüfung bei der Aktivierung läuft jetzt auch, wenn TranslatePress inaktiv ist.
+*   **Neu: Filter `trp_ai_max_output_tokens`** zur Anpassung der Ausgabe-Token-Limits pro Engine/Modell.
 
 ### 2.0.0
 *   **Architektur-Refactoring**: Einführung von drei abstrakten Basisklassen - AbstractTranslationEngine, AbstractApiHelper und AbstractRegisterEngine - wodurch etwa 1.000 Zeilen doppelter Code entfernt wurden.

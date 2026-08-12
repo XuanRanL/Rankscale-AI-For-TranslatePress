@@ -7,8 +7,8 @@ Rankscale AI For TranslatePress 是一个强大的 TranslatePress 扩展插件�
 ## ✨ 主要特性
 
 *   **多引擎支持**：
-    *   **DeepSeek API**：通过 SiliconFlow (硅基流动)、DeepSeek 官方或自定义端点提供高质量翻译（支持 DeepSeek-V3.2，支持深度思考模式）。
-    *   **Google Gemini API**：支持 Gemini 2.5 Flash / Pro、Gemini 3 Flash 等最新模型，拥有充足的免费额度。
+    *   **DeepSeek API**：通过 SiliconFlow (硅基流动)、DeepSeek 官方或自定义端点提供高质量翻译（SiliconFlow 默认 DeepSeek-V3.2，官方端点默认 deepseek-v4-flash，支持深度思考模式）。
+    *   **Google Gemini API**：支持 Gemini 3.6 Flash、Gemini 3.5 Flash-Lite 及 Gemini 2.5 系列模型，拥有充足的免费额度。
     *   **OpenAI (ChatGPT) API**：支持 GPT-5.4、GPT-5.2 等模型，兼容 Responses API 和 Chat Completions。
 *   **深度思考模式**：DeepSeek 引擎支持开启 `enable_thinking`，模型在翻译前进行推理思考，提升翻译质量。可自定义 Thinking Budget（128-32768 tokens）。
 *   **自动重试**：遇到 API 限流（429）或服务器临时故障（5xx）时，自动使用指数退避策略重试，确保翻译任务顺利完成。
@@ -18,8 +18,9 @@ Rankscale AI For TranslatePress 是一个强大的 TranslatePress 扩展插件�
     *   HTML 注入防护：自动阻止 AI 在纯文本翻译中引入 HTML 标签。
 *   **灵活配置**：
     *   DeepSeek：支持 SiliconFlow / DeepSeek 官方 / 自定义 API 端点切换。
-    *   Gemini：支持选择 Flash（快速）、Flash-Lite（最便宜）、Pro（最高质量）、Gemini 3（前沿）模型。
-    *   OpenAI：支持 Responses API（推荐）和 Chat Completions（兼容）双端点。
+    *   Gemini：支持选择 Gemini 3.6 Flash（推荐）、3.5 Flash-Lite（最便宜）、2.5 系列（旧版）模型。
+    *   OpenAI：支持 Responses API（推荐）和 Chat Completions（兼容）双端点，自动适配 GPT-5 系列参数要求。
+    *   **自定义模型 ID**：三个引擎都支持手动输入任意模型 ID——厂商发布新模型或改名后无需等插件更新即可使用。
     *   API 密钥以密码形式显示，安全性更高。
 *   **多站点支持**：兼容 WordPress Multisite，支持网络级别激活的 TranslatePress。
 *   **高效架构**：基于抽象基类设计，代码简洁、可维护性强，新增翻译引擎只需极少代码。
@@ -81,6 +82,15 @@ Rankscale AI For TranslatePress 是一个强大的 TranslatePress 扩展插件�
 插件内置了自动重试机制。当 API 返回 429（限流）或 5xx（服务器错误）时，会自动等待后重试（最多重试 2 次），无需手动干预。
 
 ## 📅 更新日志
+
+### 2.1.0
+*   **新增：自定义模型 ID**：DeepSeek / Gemini / OpenAI 三个引擎均可手动输入任意模型 ID。厂商更换模型名（如 deepseek-chat 退役）不再导致插件失效，从根源上解决模型名过期问题。
+*   **修复：DeepSeek 官方端点失效**：`deepseek-chat` 已于 2026-07-24 被 DeepSeek 官方退役，官方端点默认模型更新为 `deepseek-v4-flash`；`enable_thinking`/`thinking_budget` 为 SiliconFlow 专有参数，不再发送给官方端点。
+*   **修复：OpenAI GPT-5 参数兼容**：GPT-5/o 系列推理模型不再发送 `temperature`（该系列仅接受默认值 1，否则返回 400）；Chat Completions 端点改用 `max_completion_tokens` 取代已被 GPT-5 拒绝的 `max_tokens`；输出 token 上限按模型家族适配（gpt-4o-mini 16384 / gpt-4.1 32768）。
+*   **修复：Gemini 采样参数弃用**：按 Google 官方指引移除 `temperature`/`topP`/`topK`（Gemini 3.5+ 起已被忽略，未来版本将直接返回 400）。
+*   **改进：Gemini 模型列表更新**：默认模型更新为 `gemini-3.6-flash`，新增 `gemini-3.5-flash-lite`；旧设置中已退役的模型 ID（如 gemini-3-flash-preview）自动映射到在售替代模型。
+*   **修复：激活钩子注册顺序**：修复 TranslatePress 未激活时，本插件激活依赖检查不会执行的问题。
+*   **新增：`trp_ai_max_output_tokens` 过滤器**：可按引擎/模型自定义输出 token 上限。
 
 ### 2.0.0
 *   **架构重构**：引入 AbstractTranslationEngine、AbstractApiHelper、AbstractRegisterEngine 三个抽象基类，消除约 1000 行重复代码。
