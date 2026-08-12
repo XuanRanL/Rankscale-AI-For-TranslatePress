@@ -15,8 +15,32 @@ jQuery(function($) {
         }
     }
 
+    function toggleCustomModelField(selectId, wrapperId) {
+        var $select = $(selectId);
+        if (!$select.length) {
+            return;
+        }
+        if ($select.val() === 'custom') {
+            $(wrapperId).show();
+        } else {
+            $(wrapperId).hide();
+        }
+    }
+
+    function toggleGeminiFields() {
+        toggleCustomModelField('#trp-gemini-model', '#trp-gemini-custom-model-wrapper');
+    }
+
+    function toggleOpenAIFields() {
+        toggleCustomModelField('#trp-openai-model', '#trp-openai-custom-model-wrapper');
+    }
+
     $('#trp-deepseek-api-endpoint').on('change', toggleDeepSeekFields);
     $('#trp-deepseek-enable-thinking').on('change', toggleDeepSeekFields);
+    $('#trp-gemini-model').on('change', toggleGeminiFields);
+    $('#trp-openai-model').on('change', toggleOpenAIFields);
 
     toggleDeepSeekFields();
+    toggleGeminiFields();
+    toggleOpenAIFields();
 });

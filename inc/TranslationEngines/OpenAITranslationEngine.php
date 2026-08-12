@@ -9,14 +9,18 @@ class OpenAITranslationEngine extends AbstractTranslationEngine
 
     const FIELD_API_KEY = 'openai-api-key';
     const FIELD_MODEL = 'openai-model';
+    const FIELD_CUSTOM_MODEL = 'openai-custom-model';
     const FIELD_ENDPOINT = 'openai-endpoint';
+
+    const DEFAULT_MODEL = 'gpt-5.4';
 
     const AVAILABLE_MODELS = [
         'gpt-5.4'     => 'GPT-5.4 (Latest)',
         'gpt-5.2'     => 'GPT-5.2',
         'gpt-5.2-pro' => 'GPT-5.2 Pro',
         'gpt-4.1'     => 'GPT-4.1',
-        'gpt-4o-mini'  => 'GPT-4o mini',
+        'gpt-4o-mini' => 'GPT-4o mini',
+        'custom'      => 'Custom model ID…',
     ];
 
     const AVAILABLE_ENDPOINTS = [
@@ -34,24 +38,33 @@ class OpenAITranslationEngine extends AbstractTranslationEngine
         $systemInstruction = OpenAIApiHelper::getSystemInstruction($language_code, $source_language);
         $userContent       = OpenAIApiHelper::getUserContent($strings_array);
 
+        $model     = $this->get_model();
+        $maxOutput = $this->get_max_output_tokens($model);
+
         if ($this->get_endpoint() === 'responses') {
             $data = [
-                'model'             => $this->get_model(),
+                'model'             => $model,
                 'instructions'      => $systemInstruction,
                 'input'             => $userContent,
-                'temperature'       => 0.3,
-                'max_output_tokens' => 52000,
+                'max_output_tokens' => $maxOutput,
             ];
         } else {
+            // max_completion_tokens replaced max_tokens for all current chat models;
+            // max_tokens gets a hard 400 from the GPT-5 family.
             $data = [
-                'model'       => $this->get_model(),
-                'temperature' => 0.3,
-                'messages'    => [
+                'model'                 => $model,
+                'messages'              => [
                     ['role' => 'system', 'content' => $systemInstruction],
                     ['role' => 'user',   'content' => $userContent],
                 ],
-                'max_tokens' => 52000,
+                'max_completion_tokens' => $maxOutput,
             ];
+        }
+
+        // Reasoning models (gpt-5.x, o-series) reject any temperature other than
+        // the default 1 with HTTP 400, so only non-reasoning models get 0.3.
+        if (!$this->is_reasoning_model($model)) {
+            $data['temperature'] = 0.3;
         }
 
         $referer = $this->get_referer();
@@ -66,6 +79,30 @@ class OpenAITranslationEngine extends AbstractTranslationEngine
             ],
             'body' => json_encode($data),
         ]);
+    }
+
+    protected function is_reasoning_model($model)
+    {
+        return (bool) preg_match('/^(gpt-5|o\d)/i', $model);
+    }
+
+    /**
+     * Requesting more output tokens than a model supports is a hard 400,
+     * so cap per model family instead of one blanket value.
+     */
+    protected function get_max_output_tokens($model)
+    {
+        if (strpos($model, 'gpt-4o-mini') === 0) {
+            $cap = 16384;
+        } elseif (strpos($model, 'gpt-4.1') === 0) {
+            $cap = 32768;
+        } elseif ($this->is_reasoning_model($model)) {
+            $cap = 52000;
+        } else {
+            // Unknown custom model: stay under the smallest common limit.
+            $cap = 16384;
+        }
+        return (int) apply_filters('trp_ai_max_output_tokens', $cap, self::ENGINE_KEY, $model);
     }
 
     protected function extractTranslatedContent($responseBody): string
@@ -102,11 +139,18 @@ class OpenAITranslationEngine extends AbstractTranslationEngine
 
     public function get_model()
     {
-        $model = isset($this->settings['trp_machine_translation_settings'][self::FIELD_MODEL])
-            ? $this->settings['trp_machine_translation_settings'][self::FIELD_MODEL] : 'gpt-5.4';
-        if (!array_key_exists($model, self::AVAILABLE_MODELS)) {
-            $model = 'gpt-5.4';
+        $mt_settings = $this->settings['trp_machine_translation_settings'] ?? [];
+        $model = isset($mt_settings[self::FIELD_MODEL]) ? $mt_settings[self::FIELD_MODEL] : self::DEFAULT_MODEL;
+
+        if ($model === 'custom') {
+            $custom = isset($mt_settings[self::FIELD_CUSTOM_MODEL]) ? trim($mt_settings[self::FIELD_CUSTOM_MODEL]) : '';
+            $model  = ($custom !== '') ? $custom : self::DEFAULT_MODEL;
         }
+
+        if (!preg_match('/^[A-Za-z0-9][A-Za-z0-9._-]*$/', $model)) {
+            $model = self::DEFAULT_MODEL;
+        }
+
         return $model;
     }
 

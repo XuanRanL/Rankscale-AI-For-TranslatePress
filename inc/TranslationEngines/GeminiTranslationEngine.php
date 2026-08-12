@@ -8,12 +8,24 @@ class GeminiTranslationEngine extends AbstractTranslationEngine
     const ENGINE_KEY = 'gemini_translate';
     const FIELD_API_KEY = 'gemini-api-key';
     const FIELD_MODEL = 'gemini-model';
+    const FIELD_CUSTOM_MODEL = 'gemini-custom-model';
+
+    const DEFAULT_MODEL = 'gemini-3.6-flash';
 
     const AVAILABLE_MODELS = [
-        'gemini-2.5-flash'       => 'Gemini 2.5 Flash (Fast & Efficient)',
-        'gemini-2.5-flash-lite'  => 'Gemini 2.5 Flash-Lite (Cheapest)',
-        'gemini-2.5-pro'         => 'Gemini 2.5 Pro (Best Quality)',
-        'gemini-3-flash-preview' => 'Gemini 3 Flash (Preview - Frontier)',
+        'gemini-3.6-flash'      => 'Gemini 3.6 Flash (Recommended)',
+        'gemini-3.5-flash-lite' => 'Gemini 3.5 Flash-Lite (Cheapest)',
+        'gemini-2.5-flash'      => 'Gemini 2.5 Flash (Legacy)',
+        'gemini-2.5-pro'        => 'Gemini 2.5 Pro (Legacy)',
+        'custom'                => 'Custom model ID…',
+    ];
+
+    // Retired API model IDs mapped to their closest living replacement, so
+    // settings saved under an older plugin version keep translating after
+    // Google renames a model instead of silently 404ing.
+    const LEGACY_MODEL_MAP = [
+        'gemini-3-flash-preview' => 'gemini-3.6-flash',
+        'gemini-2.5-flash-lite'  => 'gemini-3.5-flash-lite',
     ];
 
     protected function getApiHelperClass(): string { return GeminiApiHelper::class; }
@@ -25,7 +37,8 @@ class GeminiTranslationEngine extends AbstractTranslationEngine
     {
         $systemInstruction = GeminiApiHelper::getSystemInstruction($language_code, $source_language);
         $userContent       = GeminiApiHelper::getUserContent($strings_array);
-        $data              = GeminiApiHelper::buildRequestBody($userContent, 0.3, $systemInstruction);
+        $maxOutputTokens   = (int) apply_filters('trp_ai_max_output_tokens', 52000, self::ENGINE_KEY, $this->get_model());
+        $data              = GeminiApiHelper::buildRequestBody($userContent, $systemInstruction, $maxOutputTokens);
 
         $referer = $this->get_referer();
 
@@ -68,11 +81,23 @@ class GeminiTranslationEngine extends AbstractTranslationEngine
 
     public function get_model()
     {
-        $model = isset($this->settings['trp_machine_translation_settings'][self::FIELD_MODEL])
-            ? $this->settings['trp_machine_translation_settings'][self::FIELD_MODEL] : 'gemini-2.5-flash';
-        if (!array_key_exists($model, self::AVAILABLE_MODELS)) {
-            $model = 'gemini-2.5-flash';
+        $mt_settings = $this->settings['trp_machine_translation_settings'] ?? [];
+        $model = isset($mt_settings[self::FIELD_MODEL]) ? $mt_settings[self::FIELD_MODEL] : self::DEFAULT_MODEL;
+
+        if ($model === 'custom') {
+            $custom = isset($mt_settings[self::FIELD_CUSTOM_MODEL]) ? trim($mt_settings[self::FIELD_CUSTOM_MODEL]) : '';
+            $model  = ($custom !== '') ? $custom : self::DEFAULT_MODEL;
         }
+
+        if (isset(self::LEGACY_MODEL_MAP[$model])) {
+            $model = self::LEGACY_MODEL_MAP[$model];
+        }
+
+        // Model ID lands in the request URL path; anything outside this charset falls back.
+        if (!preg_match('/^[A-Za-z0-9][A-Za-z0-9._-]*$/', $model)) {
+            $model = self::DEFAULT_MODEL;
+        }
+
         return $model;
     }
 

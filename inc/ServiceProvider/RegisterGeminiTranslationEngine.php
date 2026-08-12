@@ -45,7 +45,7 @@ class RegisterGeminiTranslationEngine extends AbstractRegisterEngine
                     name="trp_machine_translation_settings[<?php echo esc_attr(GeminiTranslationEngine::FIELD_MODEL); ?>]"
                     class="trp-select" style="margin-top: 5px;">
                 <?php
-                $selected_model = $settings[GeminiTranslationEngine::FIELD_MODEL] ?? 'gemini-2.5-flash';
+                $selected_model = $settings[GeminiTranslationEngine::FIELD_MODEL] ?? GeminiTranslationEngine::DEFAULT_MODEL;
                 foreach (GeminiTranslationEngine::AVAILABLE_MODELS as $model_key => $model_label) { ?>
                     <option value="<?php echo esc_attr($model_key); ?>" <?php selected($selected_model, $model_key); ?>>
                         <?php echo esc_html($model_label); ?>
@@ -54,6 +54,15 @@ class RegisterGeminiTranslationEngine extends AbstractRegisterEngine
             </select>
             <span class="trp-description-text"><?php esc_html_e('Choose the Gemini model. Flash is faster and cheaper, Pro offers better quality.', 'rankscale-ai-for-translatepress'); ?></span>
         </div>
+
+        <div id="trp-gemini-custom-model-wrapper" style="margin-top: 15px;">
+            <span class="trp-primary-text-bold"><?php esc_html_e('Custom Model ID', 'rankscale-ai-for-translatepress'); ?></span>
+            <input type="text" id="trp-gemini-custom-model" class="trp-text-input" style="margin-top: 5px;"
+                   name="trp_machine_translation_settings[<?php echo esc_attr(GeminiTranslationEngine::FIELD_CUSTOM_MODEL); ?>]"
+                   value="<?php echo esc_attr($settings[GeminiTranslationEngine::FIELD_CUSTOM_MODEL] ?? ''); ?>"
+                   placeholder="gemini-3.6-flash"/>
+            <span class="trp-description-text"><?php esc_html_e('Enter any Gemini model ID exactly as listed in the Gemini API docs. Used when "Custom model ID…" is selected above, so new models work without a plugin update.', 'rankscale-ai-for-translatepress'); ?></span>
+        </div>
         <?php
     }
 
@@ -61,6 +70,9 @@ class RegisterGeminiTranslationEngine extends AbstractRegisterEngine
     {
         if (!empty($mt_settings[GeminiTranslationEngine::FIELD_MODEL]))
             $settings[GeminiTranslationEngine::FIELD_MODEL] = sanitize_text_field($mt_settings[GeminiTranslationEngine::FIELD_MODEL]);
+
+        if (isset($mt_settings[GeminiTranslationEngine::FIELD_CUSTOM_MODEL]))
+            $settings[GeminiTranslationEngine::FIELD_CUSTOM_MODEL] = sanitize_text_field(trim($mt_settings[GeminiTranslationEngine::FIELD_CUSTOM_MODEL]));
 
         return $settings;
     }

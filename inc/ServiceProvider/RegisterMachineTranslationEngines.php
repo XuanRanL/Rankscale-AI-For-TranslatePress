@@ -65,6 +65,15 @@ class RegisterMachineTranslationEngines extends AbstractRegisterEngine
         </div>
 
         <div style="margin-top: 15px;">
+            <span class="trp-primary-text-bold"><?php esc_html_e('Custom Model ID (optional)', 'rankscale-ai-for-translatepress'); ?></span>
+            <input type="text" id="trp-deepseek-custom-model" class="trp-text-input" style="margin-top: 5px;"
+                   name="trp_machine_translation_settings[<?php echo esc_attr(DeepSeekTranslationEngine::FIELD_CUSTOM_MODEL); ?>]"
+                   value="<?php echo esc_attr($settings[DeepSeekTranslationEngine::FIELD_CUSTOM_MODEL] ?? ''); ?>"
+                   placeholder="deepseek-ai/DeepSeek-V3.2"/>
+            <span class="trp-description-text"><?php esc_html_e('Leave empty for the endpoint default (SiliconFlow: deepseek-ai/DeepSeek-V3.2, DeepSeek Official: deepseek-v4-flash). Enter any model ID to override, so new models work without a plugin update.', 'rankscale-ai-for-translatepress'); ?></span>
+        </div>
+
+        <div style="margin-top: 15px;">
             <label>
                 <input type="checkbox" id="trp-deepseek-enable-thinking"
                        name="trp_machine_translation_settings[<?php echo esc_attr(DeepSeekTranslationEngine::FIELD_ENABLE_THINKING); ?>]"
@@ -94,6 +103,9 @@ class RegisterMachineTranslationEngines extends AbstractRegisterEngine
 
         if (isset($mt_settings[DeepSeekTranslationEngine::FIELD_CUSTOM_API_URL]))
             $settings[DeepSeekTranslationEngine::FIELD_CUSTOM_API_URL] = esc_url_raw($mt_settings[DeepSeekTranslationEngine::FIELD_CUSTOM_API_URL]);
+
+        if (isset($mt_settings[DeepSeekTranslationEngine::FIELD_CUSTOM_MODEL]))
+            $settings[DeepSeekTranslationEngine::FIELD_CUSTOM_MODEL] = sanitize_text_field(trim($mt_settings[DeepSeekTranslationEngine::FIELD_CUSTOM_MODEL]));
 
         $settings[DeepSeekTranslationEngine::FIELD_ENABLE_THINKING] = !empty($mt_settings[DeepSeekTranslationEngine::FIELD_ENABLE_THINKING]) ? 'yes' : 'no';
 

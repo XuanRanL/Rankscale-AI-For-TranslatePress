@@ -11,13 +11,16 @@ class GeminiApiHelper extends AbstractApiHelper {
     /**
      * Build Gemini API request body.
      *
+     * temperature/topP/topK are intentionally NOT sent: Google deprecated them
+     * starting with Gemini 3.5/3.6 (currently ignored, will return HTTP 400 in
+     * future model generations).
+     *
      * @param string $userContent
-     * @param float $temperature
      * @param string $systemInstruction
+     * @param int $maxOutputTokens
      * @return array
      */
-    public static function buildRequestBody($userContent, $temperature = 0.3, $systemInstruction = '') {
-        $maxTokens = 52000;
+    public static function buildRequestBody($userContent, $systemInstruction = '', $maxOutputTokens = 52000) {
         $body = [
             'contents' => [
                 [
@@ -27,11 +30,7 @@ class GeminiApiHelper extends AbstractApiHelper {
                 ]
             ],
             'generationConfig' => [
-                'temperature' => $temperature,
-                'topK' => 40,
-                'topP' => 0.95,
-                'maxOutputTokens' => $maxTokens,
-                'stopSequences' => []
+                'maxOutputTokens' => (int) $maxOutputTokens,
             ],
             'safetySettings' => [
                 ['category' => 'HARM_CATEGORY_HARASSMENT', 'threshold' => 'BLOCK_NONE'],

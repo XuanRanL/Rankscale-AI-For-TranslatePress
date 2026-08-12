@@ -3,7 +3,7 @@
  * Plugin Name: Rankscale AI For TranslatePress
  * Plugin URI: https://rankscaleai.com
  * Description: Supercharge TranslatePress with AI-powered translation using DeepSeek, Google Gemini, and OpenAI APIs. Features optimized prompts and automatic retry.
- * Version: 2.0.0
+ * Version: 2.1.0
  * Author: Xuanran
  * Author URI: https://rankscaleai.com
  * Text Domain: rankscale-ai-for-translatepress
@@ -41,6 +41,30 @@ if ( PHP_VERSION_ID < 70200 ) {
 }
 
 
+if (file_exists(dirname(__FILE__) . '/vendor/autoload.php')) {
+    require_once dirname(__FILE__) . '/vendor/autoload.php';
+} else {
+    if (is_admin()) {
+        add_action('admin_notices', function () {
+            printf(
+                '<div class="error"><p>%s</p></div>',
+                esc_html__('Rankscale AI For TranslatePress: vendor/autoload.php not found. Please run "composer dump-autoload" in the plugin directory.', 'rankscale-ai-for-translatepress')
+            );
+        });
+    }
+    return;
+}
+
+// Activation/deactivation hooks must be registered before any dependency
+// early-return, otherwise the activation-time TRP check never runs.
+register_activation_hook(__FILE__, function () {
+    Activate::handler();
+});
+
+register_deactivation_hook(__FILE__, function () {
+    Deactivate::handler();
+});
+
 $trp_plugin = 'translatepress-multilingual/index.php';
 $trp_active = in_array( $trp_plugin, (array) get_option( 'active_plugins', [] ) );
 if ( ! $trp_active && is_multisite() ) {
@@ -57,31 +81,9 @@ if ( ! $trp_active ) {
     return;
 }
 
-if (file_exists(dirname(__FILE__) . '/vendor/autoload.php')) {
-    require_once dirname(__FILE__) . '/vendor/autoload.php';
-} else {
-    if (is_admin()) {
-        add_action('admin_notices', function () {
-            printf(
-                '<div class="error"><p>%s</p></div>',
-                esc_html__('Rankscale AI For TranslatePress: vendor/autoload.php not found. Please run "composer dump-autoload" in the plugin directory.', 'rankscale-ai-for-translatepress')
-            );
-        });
-    }
-    return;
-}
-
 if (class_exists(Init::class)) {
     add_action('plugins_loaded', function () {
         load_plugin_textdomain('rankscale-ai-for-translatepress', false, dirname(plugin_basename(__FILE__)) . '/languages');
         Init::registerService();
     }, 1);
 }
-
-register_activation_hook(__FILE__, function () {
-    Activate::handler();
-});
-
-register_deactivation_hook(__FILE__, function () {
-    Deactivate::handler();
-});

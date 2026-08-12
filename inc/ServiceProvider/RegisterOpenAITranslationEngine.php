@@ -61,7 +61,7 @@ class RegisterOpenAITranslationEngine extends AbstractRegisterEngine
                     name="trp_machine_translation_settings[<?php echo esc_attr(OpenAITranslationEngine::FIELD_MODEL); ?>]"
                     class="trp-select" style="margin-top: 5px;">
                 <?php
-                $selected_model = $settings[OpenAITranslationEngine::FIELD_MODEL] ?? 'gpt-5.4';
+                $selected_model = $settings[OpenAITranslationEngine::FIELD_MODEL] ?? OpenAITranslationEngine::DEFAULT_MODEL;
                 foreach (OpenAITranslationEngine::AVAILABLE_MODELS as $model_key => $model_label) { ?>
                     <option value="<?php echo esc_attr($model_key); ?>" <?php selected($selected_model, $model_key); ?>>
                         <?php echo esc_html($model_label); ?>
@@ -69,6 +69,15 @@ class RegisterOpenAITranslationEngine extends AbstractRegisterEngine
                 <?php } ?>
             </select>
             <span class="trp-description-text"><?php esc_html_e('Choose the OpenAI model for translations.', 'rankscale-ai-for-translatepress'); ?></span>
+        </div>
+
+        <div id="trp-openai-custom-model-wrapper" style="margin-top: 15px;">
+            <span class="trp-primary-text-bold"><?php esc_html_e('Custom Model ID', 'rankscale-ai-for-translatepress'); ?></span>
+            <input type="text" id="trp-openai-custom-model" class="trp-text-input" style="margin-top: 5px;"
+                   name="trp_machine_translation_settings[<?php echo esc_attr(OpenAITranslationEngine::FIELD_CUSTOM_MODEL); ?>]"
+                   value="<?php echo esc_attr($settings[OpenAITranslationEngine::FIELD_CUSTOM_MODEL] ?? ''); ?>"
+                   placeholder="gpt-5.4-mini"/>
+            <span class="trp-description-text"><?php esc_html_e('Enter any OpenAI model ID. Used when "Custom model ID…" is selected above, so new models work without a plugin update.', 'rankscale-ai-for-translatepress'); ?></span>
         </div>
         <?php
     }
@@ -80,6 +89,9 @@ class RegisterOpenAITranslationEngine extends AbstractRegisterEngine
 
         if (!empty($mt_settings[OpenAITranslationEngine::FIELD_MODEL]))
             $settings[OpenAITranslationEngine::FIELD_MODEL] = sanitize_text_field($mt_settings[OpenAITranslationEngine::FIELD_MODEL]);
+
+        if (isset($mt_settings[OpenAITranslationEngine::FIELD_CUSTOM_MODEL]))
+            $settings[OpenAITranslationEngine::FIELD_CUSTOM_MODEL] = sanitize_text_field(trim($mt_settings[OpenAITranslationEngine::FIELD_CUSTOM_MODEL]));
 
         return $settings;
     }

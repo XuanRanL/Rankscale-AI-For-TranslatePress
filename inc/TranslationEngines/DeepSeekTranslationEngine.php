@@ -10,6 +10,7 @@ class DeepSeekTranslationEngine extends AbstractTranslationEngine
     const FIELD_API_KEY = 'deepseek-api-key';
     const FIELD_API_ENDPOINT = 'deepseek-api-endpoint';
     const FIELD_CUSTOM_API_URL = 'deepseek-custom-api-url';
+    const FIELD_CUSTOM_MODEL = 'deepseek-custom-model';
     const FIELD_ENABLE_THINKING = 'deepseek-enable-thinking';
     const FIELD_THINKING_BUDGET = 'deepseek-thinking-budget';
 
@@ -32,18 +33,22 @@ class DeepSeekTranslationEngine extends AbstractTranslationEngine
         $enable_thinking = $this->get_enable_thinking();
 
         $data = [
-            'model'           => $this->get_model_name(),
-            'temperature'     => 0.3,
-            'messages'        => [
+            'model'       => $this->get_model_name(),
+            'temperature' => 0.3,
+            'messages'    => [
                 ['role' => 'system', 'content' => $systemInstruction],
                 ['role' => 'user',   'content' => $userContent],
             ],
-            'max_tokens'      => 52000,
-            'enable_thinking' => $enable_thinking,
+            'max_tokens'  => (int) apply_filters('trp_ai_max_output_tokens', 52000, self::ENGINE_KEY, $this->get_model_name()),
         ];
 
-        if ($enable_thinking) {
-            $data['thinking_budget'] = $this->get_thinking_budget();
+        // enable_thinking/thinking_budget are SiliconFlow request fields; the
+        // DeepSeek official API uses a different mechanism and may reject them.
+        if ($this->get_endpoint() !== 'deepseek') {
+            $data['enable_thinking'] = $enable_thinking;
+            if ($enable_thinking) {
+                $data['thinking_budget'] = $this->get_thinking_budget();
+            }
         }
 
         $referer = $this->get_referer();
@@ -72,9 +77,16 @@ class DeepSeekTranslationEngine extends AbstractTranslationEngine
 
     public function get_model_name()
     {
+        $custom = isset($this->settings['trp_machine_translation_settings'][self::FIELD_CUSTOM_MODEL])
+            ? trim($this->settings['trp_machine_translation_settings'][self::FIELD_CUSTOM_MODEL]) : '';
+        if ($custom !== '' && preg_match('#^[A-Za-z0-9][A-Za-z0-9._/-]*$#', $custom)) {
+            return $custom;
+        }
+
         switch ($this->get_endpoint()) {
             case 'deepseek':
-                return 'deepseek-chat';
+                // 'deepseek-chat' was hard-retired by DeepSeek on 2026-07-24.
+                return 'deepseek-v4-flash';
             default:
                 return 'deepseek-ai/DeepSeek-V3.2';
         }
