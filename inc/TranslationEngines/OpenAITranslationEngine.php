@@ -35,7 +35,7 @@ class OpenAITranslationEngine extends AbstractTranslationEngine
 
     public function send_request($source_language, $language_code, $strings_array)
     {
-        $systemInstruction = OpenAIApiHelper::getSystemInstruction($language_code, $source_language);
+        $systemInstruction = $this->get_system_instruction($language_code, $source_language);
         $userContent       = OpenAIApiHelper::getUserContent($strings_array);
 
         $model     = $this->get_model();
@@ -71,14 +71,30 @@ class OpenAITranslationEngine extends AbstractTranslationEngine
 
         return wp_remote_post($this->get_api_url(), [
             'method'  => 'POST',
-            'timeout' => 180,
+            'timeout' => $this->get_request_timeout(180),
             'headers' => [
                 'Referer'       => $referer,
                 'Authorization' => 'Bearer ' . $this->get_api_key(),
                 'Content-Type'  => 'application/json',
             ],
-            'body' => json_encode($data),
+            'body' => wp_json_encode($data),
         ]);
+    }
+
+    protected function isTruncatedResponse($responseBody): bool
+    {
+        $data = json_decode($responseBody, true);
+        if (!is_array($data)) {
+            return false;
+        }
+
+        // Responses API
+        if (($data['status'] ?? '') === 'incomplete') {
+            return ($data['incomplete_details']['reason'] ?? '') === 'max_output_tokens';
+        }
+
+        // Chat Completions
+        return ($data['choices'][0]['finish_reason'] ?? '') === 'length';
     }
 
     protected function is_reasoning_model($model)
@@ -118,9 +134,9 @@ class OpenAITranslationEngine extends AbstractTranslationEngine
 
         if (isset($data['output']) && is_array($data['output'])) {
             foreach ($data['output'] as $item) {
-                if (isset($item['type']) && $item['type'] === 'message' && isset($item['content'])) {
+                if (isset($item['type']) && $item['type'] === 'message' && isset($item['content']) && is_array($item['content'])) {
                     foreach ($item['content'] as $block) {
-                        if (isset($block['type']) && $block['type'] === 'output_text' && isset($block['text'])) {
+                        if (isset($block['type']) && $block['type'] === 'output_text' && isset($block['text']) && is_string($block['text'])) {
                             return $block['text'];
                         }
                     }
@@ -128,7 +144,8 @@ class OpenAITranslationEngine extends AbstractTranslationEngine
             }
         }
 
-        return $data['choices'][0]['message']['content'] ?? '';
+        $content = $data['choices'][0]['message']['content'] ?? '';
+        return is_string($content) ? $content : '';
     }
 
     public function get_api_key()
@@ -147,7 +164,8 @@ class OpenAITranslationEngine extends AbstractTranslationEngine
             $model  = ($custom !== '') ? $custom : self::DEFAULT_MODEL;
         }
 
-        if (!preg_match('/^[A-Za-z0-9][A-Za-z0-9._-]*$/', $model)) {
+        // The model ID travels in the JSON body; fine-tuned models are named "ft:gpt-…:org::id".
+        if (!preg_match('/^[A-Za-z0-9][A-Za-z0-9._:-]*$/', $model)) {
             $model = self::DEFAULT_MODEL;
         }
 

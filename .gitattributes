@@ -1,0 +1,5 @@
+# Kept out of the ZIP that GitHub builds ("Download ZIP", release archives), so a
+# site that installs the plugin from it does not get development files.
+/tests          export-ignore
+/.gitattributes export-ignore
+/.gitignore     export-ignore

@@ -13,12 +13,17 @@ class DeepSeekTranslationEngine extends AbstractTranslationEngine
     const FIELD_CUSTOM_MODEL = 'deepseek-custom-model';
     const FIELD_ENABLE_THINKING = 'deepseek-enable-thinking';
     const FIELD_THINKING_BUDGET = 'deepseek-thinking-budget';
+    const FIELD_REASONING_EFFORT = 'deepseek-reasoning-effort';
 
     const AVAILABLE_ENDPOINTS = [
         'siliconflow' => 'SiliconFlow',
         'deepseek'    => 'DeepSeek Official',
         'custom'      => 'Custom URL',
     ];
+
+    // OpenAI-style `reasoning_effort` values for the custom endpoint. The empty value
+    // sends no `reasoning_effort` and keeps the thinking switch below in charge.
+    const REASONING_EFFORTS = ['', 'none', 'minimal', 'low', 'medium', 'high', 'xhigh'];
 
     protected function getApiHelperClass(): string { return DeepSeekApiHelper::class; }
     protected function getFilterPrefix(): string   { return 'deepseek'; }
@@ -27,42 +32,58 @@ class DeepSeekTranslationEngine extends AbstractTranslationEngine
 
     public function send_request($source_language, $language_code, $strings_array)
     {
-        $systemInstruction = DeepSeekApiHelper::getSystemInstruction($language_code, $source_language);
-        $userContent       = DeepSeekApiHelper::getUserContent($strings_array);
-
-        $enable_thinking = $this->get_enable_thinking();
+        $endpoint = $this->get_endpoint();
+        $model    = $this->get_model_name();
 
         $data = [
-            'model'       => $this->get_model_name(),
-            'temperature' => 0.3,
-            'messages'    => [
-                ['role' => 'system', 'content' => $systemInstruction],
-                ['role' => 'user',   'content' => $userContent],
+            'model'    => $model,
+            'messages' => [
+                ['role' => 'system', 'content' => $this->get_system_instruction($language_code, $source_language)],
+                ['role' => 'user',   'content' => DeepSeekApiHelper::getUserContent($strings_array)],
             ],
-            'max_tokens'  => (int) apply_filters('trp_ai_max_output_tokens', 52000, self::ENGINE_KEY, $this->get_model_name()),
         ];
 
-        // enable_thinking/thinking_budget are SiliconFlow request fields; the
-        // DeepSeek official API uses a different mechanism and may reject them.
-        if ($this->get_endpoint() !== 'deepseek') {
+        // Return null from the filter to leave the temperature out (some reasoning
+        // models accept only their default).
+        $temperature = apply_filters('trp_ai_temperature', 0.3, self::ENGINE_KEY, $model);
+        if (is_numeric($temperature)) {
+            $data['temperature'] = (float) $temperature;
+        }
+
+        // A service that refuses this limit (HTTP 400 "max_tokens is too large") can be
+        // given a smaller one through the filter; 0 sends no limit at all.
+        $max_tokens = (int) apply_filters('trp_ai_max_output_tokens', 52000, self::ENGINE_KEY, $model);
+        if ($max_tokens > 0) {
+            $data['max_tokens'] = $max_tokens;
+        }
+
+        $enable_thinking  = $this->get_enable_thinking();
+        $reasoning_effort = ($endpoint === 'custom') ? $this->get_reasoning_effort() : '';
+        $is_thinking      = $enable_thinking;
+
+        if ($reasoning_effort !== '') {
+            // OpenAI-compatible gateways take `reasoning_effort`; they ignore or refuse
+            // SiliconFlow's `enable_thinking`, so only one of the two is sent.
+            $data['reasoning_effort'] = $reasoning_effort;
+            $is_thinking = !in_array($reasoning_effort, ['none', 'minimal', 'low'], true);
+        } elseif ($endpoint !== 'deepseek') {
+            // enable_thinking/thinking_budget are SiliconFlow request fields; the
+            // DeepSeek official API uses a different mechanism and may reject them.
             $data['enable_thinking'] = $enable_thinking;
             if ($enable_thinking) {
                 $data['thinking_budget'] = $this->get_thinking_budget();
             }
         }
 
-        $referer = $this->get_referer();
-        $timeout = $enable_thinking ? 300 : 180;
-
         return wp_remote_post($this->get_api_url(), [
             'method'  => 'POST',
-            'timeout' => $timeout,
+            'timeout' => $this->get_request_timeout($is_thinking ? 300 : 180),
             'headers' => [
-                'Referer'       => $referer,
+                'Referer'       => $this->get_referer(),
                 'Authorization' => 'Bearer ' . $this->get_api_key(),
                 'Content-Type'  => 'application/json',
             ],
-            'body' => json_encode($data),
+            'body' => wp_json_encode($data),
         ]);
     }
 
@@ -72,14 +93,23 @@ class DeepSeekTranslationEngine extends AbstractTranslationEngine
         if (!is_array($data) || !empty($data['error'])) {
             return '';
         }
-        return $data['choices'][0]['message']['content'] ?? '';
+        $content = $data['choices'][0]['message']['content'] ?? '';
+        return is_string($content) ? $content : '';
+    }
+
+    protected function isTruncatedResponse($responseBody): bool
+    {
+        $data = json_decode($responseBody, true);
+        return is_array($data) && (($data['choices'][0]['finish_reason'] ?? '') === 'length');
     }
 
     public function get_model_name()
     {
         $custom = isset($this->settings['trp_machine_translation_settings'][self::FIELD_CUSTOM_MODEL])
             ? trim($this->settings['trp_machine_translation_settings'][self::FIELD_CUSTOM_MODEL]) : '';
-        if ($custom !== '' && preg_match('#^[A-Za-z0-9][A-Za-z0-9._/-]*$#', $custom)) {
+        // The model ID travels in the JSON body. ':' is part of real IDs (fine-tuned
+        // models, "name:tag" on local gateways).
+        if ($custom !== '' && preg_match('#^[A-Za-z0-9][A-Za-z0-9._/:-]*$#', $custom)) {
             return $custom;
         }
 
@@ -135,5 +165,15 @@ class DeepSeekTranslationEngine extends AbstractTranslationEngine
         $budget = isset($this->settings['trp_machine_translation_settings'][self::FIELD_THINKING_BUDGET])
             ? (int) $this->settings['trp_machine_translation_settings'][self::FIELD_THINKING_BUDGET] : 4096;
         return max(128, min(32768, $budget));
+    }
+
+    /**
+     * @return string  One of REASONING_EFFORTS; empty = not set.
+     */
+    public function get_reasoning_effort()
+    {
+        $effort = isset($this->settings['trp_machine_translation_settings'][self::FIELD_REASONING_EFFORT])
+            ? (string) $this->settings['trp_machine_translation_settings'][self::FIELD_REASONING_EFFORT] : '';
+        return in_array($effort, self::REASONING_EFFORTS, true) ? $effort : '';
     }
 }

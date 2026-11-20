@@ -61,7 +61,23 @@ class RegisterMachineTranslationEngines extends AbstractRegisterEngine
                    name="trp_machine_translation_settings[<?php echo esc_attr(DeepSeekTranslationEngine::FIELD_CUSTOM_API_URL); ?>]"
                    value="<?php echo esc_attr($settings[DeepSeekTranslationEngine::FIELD_CUSTOM_API_URL] ?? ''); ?>"
                    placeholder="https://your-api-url.com/v1/chat/completions"/>
-            <span class="trp-description-text"><?php esc_html_e('Enter a custom API URL when "Custom URL" is selected above. Must be OpenAI-compatible.', 'rankscale-ai-for-translatepress'); ?></span>
+            <span class="trp-description-text"><?php esc_html_e('Enter a custom API URL when "Custom URL" is selected above. Must be OpenAI-compatible. Enter the full address, ending in /chat/completions. While this field is empty, requests go to SiliconFlow.', 'rankscale-ai-for-translatepress'); ?></span>
+        </div>
+
+        <div id="trp-deepseek-reasoning-effort-wrapper" style="margin-top: 15px;">
+            <span class="trp-primary-text-bold"><?php esc_html_e('Reasoning Effort (Custom URL)', 'rankscale-ai-for-translatepress'); ?></span>
+            <select id="trp-deepseek-reasoning-effort"
+                    name="trp_machine_translation_settings[<?php echo esc_attr(DeepSeekTranslationEngine::FIELD_REASONING_EFFORT); ?>]"
+                    class="trp-select" style="margin-top: 5px;">
+                <?php
+                $selected_effort = $settings[DeepSeekTranslationEngine::FIELD_REASONING_EFFORT] ?? '';
+                foreach (DeepSeekTranslationEngine::REASONING_EFFORTS as $effort) { ?>
+                    <option value="<?php echo esc_attr($effort); ?>" <?php selected($selected_effort, $effort); ?>>
+                        <?php echo ($effort === '') ? esc_html__('Not set (use the Deep Thinking switch below)', 'rankscale-ai-for-translatepress') : esc_html($effort); ?>
+                    </option>
+                <?php } ?>
+            </select>
+            <span class="trp-description-text"><?php esc_html_e('For OpenAI-compatible gateways and reasoning models: sent as "reasoning_effort". Lower values answer faster, which matters because pages wait for the translation. When a value is selected, the Deep Thinking switch below is not sent. Pick only values your service accepts.', 'rankscale-ai-for-translatepress'); ?></span>
         </div>
 
         <div style="margin-top: 15px;">
@@ -107,7 +123,15 @@ class RegisterMachineTranslationEngines extends AbstractRegisterEngine
         if (isset($mt_settings[DeepSeekTranslationEngine::FIELD_CUSTOM_MODEL]))
             $settings[DeepSeekTranslationEngine::FIELD_CUSTOM_MODEL] = sanitize_text_field(trim($mt_settings[DeepSeekTranslationEngine::FIELD_CUSTOM_MODEL]));
 
-        $settings[DeepSeekTranslationEngine::FIELD_ENABLE_THINKING] = !empty($mt_settings[DeepSeekTranslationEngine::FIELD_ENABLE_THINKING]) ? 'yes' : 'no';
+        if (isset($mt_settings[DeepSeekTranslationEngine::FIELD_REASONING_EFFORT])) {
+            $effort = sanitize_text_field($mt_settings[DeepSeekTranslationEngine::FIELD_REASONING_EFFORT]);
+            $settings[DeepSeekTranslationEngine::FIELD_REASONING_EFFORT] = in_array($effort, DeepSeekTranslationEngine::REASONING_EFFORTS, true) ? $effort : '';
+        }
+
+        // The checkbox posts "yes" or nothing. Settings saved from code carry the stored
+        // "no", which is a non-empty string: testing with !empty() switched thinking on.
+        $thinking = $mt_settings[DeepSeekTranslationEngine::FIELD_ENABLE_THINKING] ?? 'no';
+        $settings[DeepSeekTranslationEngine::FIELD_ENABLE_THINKING] = ($thinking === 'yes') ? 'yes' : 'no';
 
         if (isset($mt_settings[DeepSeekTranslationEngine::FIELD_THINKING_BUDGET])) {
             $budget = (int) $mt_settings[DeepSeekTranslationEngine::FIELD_THINKING_BUDGET];

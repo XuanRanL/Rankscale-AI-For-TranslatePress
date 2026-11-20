@@ -79,9 +79,21 @@ Rankscale AI For TranslatePress is a powerful TranslatePress extension that adds
 *   **OpenAI**: billed per token; pricing varies by model.
 
 ### What if I hit API rate limits?
-The plugin includes a built-in automatic retry mechanism. When the API returns 429 (rate limited) or 5xx (server error), it automatically waits and retries (up to 2 times), with no manual intervention needed.
+The plugin includes a built-in automatic retry mechanism. When the API returns 429 (rate limited) or 5xx (server error), it automatically waits and retries (once), with no manual intervention needed.
 
 ## 📅 Changelog
+
+### 2.1.1
+*   **Fix: failed requests stored the source text as the translation**: on an API error, a timeout or an empty answer, earlier versions handed the source text back to TranslatePress, which saved it as "machine translated" and never asked again, so the page stayed untranslated for good. Failed strings are now left out, and TranslatePress requests them again on the next page load.
+*   **New: pause after repeated failures**: after three failed requests in a row (or at once on HTTP 401/402/403/429) translation pauses for 10 minutes, so a service that is down, out of credit or refusing the key is not called and waited for on every page load. The filter `trp_ai_failure_pause` changes the number of seconds; 0 switches the pause off.
+*   **Fix: misnumbered answers put translations on the wrong strings**: when the model skipped a number, the following items were glued onto the previous one; when it merged or split items, every later translation was off by one. Only the reliably numbered part of an answer is used now, an answer with the wrong item count is not saved at all, and an answer cut off at the output limit keeps only its complete items. A text that has numbered lines of its own (a multi-line list of steps) is sent in a request of its own, so its lines are not mistaken for the next items.
+*   **Fix: several API calls in a row during one page load**: `get_chunk_size()` is implemented, so one TranslatePress chunk is one API call (a 50-string chunk used to become three calls in a row while the page waited).
+*   **New: Reasoning Effort for the custom endpoint**: with "Custom URL" selected, the DeepSeek engine can send `reasoning_effort` (none / minimal / low / medium / high / xhigh) for OpenAI-compatible gateways and reasoning models; when it is set, the SiliconFlow-specific `enable_thinking` is not sent.
+*   **Fix: timeouts are no longer retried**: a timed-out call has already made the page wait a whole timeout; untranslated strings are requested again by TranslatePress on the next page load.
+*   **Fix: Deep Thinking switched itself on**: when the settings were saved from code rather than from the settings page, a disabled "Enable Deep Thinking" was stored as enabled.
+*   **New filters**: `trp_ai_system_instruction` (add site context or terminology to the prompt), `trp_ai_request_timeout`, `trp_ai_temperature`; `trp_ai_max_output_tokens` may return 0 to send no limit.
+*   **Improved**: a prompt rule against adding information that is not in the source; multi-part Gemini answers are joined; model IDs may contain `:` (fine-tuned models); request bodies use `wp_json_encode`.
+*   **New: tests**: `php tests/run.php` (plain PHP, no WordPress needed).
 
 ### 2.1.0
 *   **New: Custom model ID** for all three engines (DeepSeek / Gemini / OpenAI). Provider model renames (like the deepseek-chat retirement) no longer break the plugin — the root cure for stale model lists.

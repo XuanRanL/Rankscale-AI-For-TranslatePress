@@ -79,9 +79,21 @@ Rankscale AI For TranslatePress est une puissante extension de TranslatePress qu
 *   **OpenAI** : facturé au token ; les tarifs varient selon le modèle.
 
 ### Que faire en cas de limitation de débit de l'API ?
-L'extension intègre un mécanisme de nouvelle tentative automatique. Lorsque l'API renvoie 429 (limitation de débit) ou 5xx (erreur serveur), elle attend puis réessaie automatiquement (jusqu'à 2 fois), sans intervention manuelle.
+L'extension intègre un mécanisme de nouvelle tentative automatique. Lorsque l'API renvoie 429 (limitation de débit) ou 5xx (erreur serveur), elle attend puis réessaie automatiquement (une fois), sans intervention manuelle.
 
 ## 📅 Journal des modifications
+
+### 2.1.1
+*   **Correctif : les requêtes échouées enregistraient le texte source comme traduction** : en cas d'erreur de l'API, de délai dépassé ou de réponse vide, les versions précédentes renvoyaient le texte source à TranslatePress, qui l'enregistrait comme « traduit automatiquement » et ne le redemandait plus. Les chaînes en échec ne sont plus renvoyées ; TranslatePress les redemande au chargement de page suivant.
+*   **Nouveau : pause après des échecs répétés** : après trois requêtes en échec d'affilée (ou immédiatement en cas de HTTP 401/402/403/429), la traduction est mise en pause pendant 10 minutes, afin qu'un service en panne, sans crédit ou refusant la clé ne soit pas appelé et attendu à chaque chargement de page. Le filtre `trp_ai_failure_pause` modifie le nombre de secondes ; 0 désactive la pause.
+*   **Correctif : réponses mal numérotées** : quand le modèle sautait un numéro, les éléments suivants étaient collés au précédent ; quand il fusionnait ou scindait des éléments, toutes les traductions suivantes étaient décalées d'un rang. Seule la partie numérotée de façon fiable est utilisée, une réponse dont le nombre d'éléments ne correspond pas n'est pas enregistrée, et une réponse tronquée à la limite de sortie ne conserve que ses éléments complets. Un texte qui contient ses propres lignes numérotées (une liste d'étapes sur plusieurs lignes) est envoyé seul, afin que ses lignes ne soient pas prises pour les éléments suivants.
+*   **Correctif : plusieurs appels API à la suite pendant un chargement de page** : `get_chunk_size()` est implémentée, un lot TranslatePress correspond à un appel API (un lot de 50 chaînes devenait trois appels successifs).
+*   **Nouveau : Reasoning Effort pour le point de terminaison personnalisé** : avec « Custom URL », le moteur DeepSeek peut envoyer `reasoning_effort` (none / minimal / low / medium / high / xhigh) aux passerelles compatibles OpenAI ; dans ce cas `enable_thinking`, propre à SiliconFlow, n'est pas envoyé.
+*   **Correctif : les délais dépassés ne sont plus réessayés** : la page a déjà attendu un délai complet ; TranslatePress redemande les chaînes non traduites au chargement suivant.
+*   **Correctif : « Deep Thinking » s'activait tout seul** : lorsque les réglages étaient enregistrés par du code et non depuis la page de réglages, l'option « Enable Deep Thinking » désactivée était enregistrée comme activée.
+*   **Nouveaux filtres** : `trp_ai_system_instruction` (contexte du site, terminologie), `trp_ai_request_timeout`, `trp_ai_temperature` ; `trp_ai_max_output_tokens` peut renvoyer 0 pour n'envoyer aucune limite.
+*   **Amélioration** : règle de prompt interdisant d'ajouter des informations absentes de la source ; les réponses Gemini en plusieurs parties sont réunies ; les ID de modèle peuvent contenir `:` ; les corps de requête utilisent `wp_json_encode`.
+*   **Nouveau : tests** : `php tests/run.php` (PHP seul, sans WordPress).
 
 ### 2.1.0
 *   **Nouveau : ID de modèle personnalisé** pour les trois moteurs (DeepSeek / Gemini / OpenAI). Les renommages de modèles par les fournisseurs (comme le retrait de deepseek-chat) ne cassent plus l'extension — la solution de fond au problème des listes de modèles obsolètes.

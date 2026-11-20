@@ -79,9 +79,21 @@ Rankscale AI For TranslatePress 是一个强大的 TranslatePress 扩展插件�
 *   **OpenAI**：按 token 计费，不同模型价格不同。
 
 ### 遇到 API 限流怎么办？
-插件内置了自动重试机制。当 API 返回 429（限流）或 5xx（服务器错误）时，会自动等待后重试（最多重试 2 次），无需手动干预。
+插件内置了自动重试机制。当 API 返回 429（限流）或 5xx（服务器错误）时，会自动等待后重试（重试 1 次），无需手动干预。
 
 ## 📅 更新日志
+
+### 2.1.1
+*   **修复：请求失败时把原文存成译文**：接口报错、超时或返回空内容时，旧版把原文交还给 TranslatePress，TranslatePress 会把它当作“已机器翻译”永久保存、不再重试，页面上就一直是原文。现在失败的字符串不返回，TranslatePress 会在下次页面加载时重新请求。
+*   **新增：连续失败后自动暂停**：连续 3 次请求失败（接口返回 401/402/403/429 时立即）暂停翻译 10 分钟，避免接口故障、欠费或密钥失效时每次页面加载都去请求并等待。可用过滤器 `trp_ai_failure_pause` 调整秒数，返回 0 关闭。
+*   **修复：编号错位导致译文串行**：模型漏掉一个编号时，后面几条译文会被拼到前一条里；模型合并或拆分条目时，其后的译文整体错一位。现在只采用编号可靠的部分，条数对不上的回答整批不保存；因输出上限被截断的回答只保留完整的条目。自带编号行的文本（如多行的步骤列表）改为单独一次请求发送，避免它的编号行被当成下一条。
+*   **修复：一次页面加载连续多次请求**：实现 `get_chunk_size()`，TranslatePress 的一个分块对应一次 API 请求（此前 50 条的分块会被拆成连续三次请求，页面要等全部完成）。
+*   **新增：自定义端点的 Reasoning Effort**：DeepSeek 引擎选择“Custom URL”时可设置 `reasoning_effort`（none / minimal / low / medium / high / xhigh），用于 OpenAI 兼容网关和推理模型；设置后不再发送 SiliconFlow 专有的 `enable_thinking`。
+*   **修复：超时不再重试**：超时已经让页面等满一次超时时间，不再原地重试；未翻译的字符串由 TranslatePress 在下次页面加载时重新请求。
+*   **修复：“深度思考”开关被自动打开**：设置由代码保存（而不是在设置页点保存）时，已关闭的 Enable Deep Thinking 会被存成开启。
+*   **新增过滤器**：`trp_ai_system_instruction`（给提示词加站点背景、术语要求）、`trp_ai_request_timeout`、`trp_ai_temperature`；`trp_ai_max_output_tokens` 返回 0 表示不发送上限。
+*   **改进**：提示词增加“忠实翻译、不得添加原文没有的信息”规则；Gemini 多段回答会合并；模型 ID 允许包含 `:`（微调模型等）；请求体改用 `wp_json_encode`。
+*   **新增测试**：`php tests/run.php`（纯 PHP，不需要 WordPress）。
 
 ### 2.1.0
 *   **新增：自定义模型 ID**：DeepSeek / Gemini / OpenAI 三个引擎均可手动输入任意模型 ID。厂商更换模型名（如 deepseek-chat 退役）不再导致插件失效，从根源上解决模型名过期问题。

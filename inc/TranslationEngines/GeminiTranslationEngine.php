@@ -35,7 +35,7 @@ class GeminiTranslationEngine extends AbstractTranslationEngine
 
     public function send_request($source_language, $language_code, $strings_array)
     {
-        $systemInstruction = GeminiApiHelper::getSystemInstruction($language_code, $source_language);
+        $systemInstruction = $this->get_system_instruction($language_code, $source_language);
         $userContent       = GeminiApiHelper::getUserContent($strings_array);
         $maxOutputTokens   = (int) apply_filters('trp_ai_max_output_tokens', 52000, self::ENGINE_KEY, $this->get_model());
         $data              = GeminiApiHelper::buildRequestBody($userContent, $systemInstruction, $maxOutputTokens);
@@ -44,13 +44,13 @@ class GeminiTranslationEngine extends AbstractTranslationEngine
 
         return wp_remote_post($this->get_api_url(), [
             'method'  => 'POST',
-            'timeout' => 120,
+            'timeout' => $this->get_request_timeout(120),
             'headers' => [
                 'Referer'        => $referer,
                 'Content-Type'   => 'application/json',
                 'x-goog-api-key' => $this->get_api_key(),
             ],
-            'body' => json_encode($data),
+            'body' => wp_json_encode($data),
         ]);
     }
 
@@ -65,12 +65,30 @@ class GeminiTranslationEngine extends AbstractTranslationEngine
             error_log(sprintf('[Rankscale AI] Gemini: empty candidates, reason=%s', $reason));
             return '';
         }
-        if (!isset($data['candidates'][0]['content']['parts'][0]['text'])) {
+
+        // A long answer can arrive in several parts; thought summaries are not translations.
+        $text  = '';
+        $parts = $data['candidates'][0]['content']['parts'] ?? [];
+        if (is_array($parts)) {
+            foreach ($parts as $part) {
+                if (is_array($part) && isset($part['text']) && is_string($part['text']) && empty($part['thought'])) {
+                    $text .= $part['text'];
+                }
+            }
+        }
+
+        if ($text === '') {
             $reason = $data['candidates'][0]['finishReason'] ?? 'unknown';
             error_log(sprintf('[Rankscale AI] Gemini: no text in candidate, finishReason=%s', $reason));
-            return '';
         }
-        return $data['candidates'][0]['content']['parts'][0]['text'];
+
+        return $text;
+    }
+
+    protected function isTruncatedResponse($responseBody): bool
+    {
+        $data = json_decode($responseBody, true);
+        return is_array($data) && (($data['candidates'][0]['finishReason'] ?? '') === 'MAX_TOKENS');
     }
 
     public function get_api_key()

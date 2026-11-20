@@ -130,6 +130,7 @@ abstract class AbstractApiHelper {
         $prompt .= "7) Do NOT add explanatory parentheses like '(the number stays the same / se mantiene igual / 没有内容)'. If an item is empty or only untranslatable tokens, return it unchanged.\n";
         $prompt .= "8) Preserve all emoji characters (e.g. 😀🎉🔥) exactly as they appear. NEVER replace, remove, or convert emojis to '?' or any other character.\n";
         $prompt .= "9) If an item looks like a URL slug (lowercase, hyphen-separated words, no spaces), translate it as a URL slug: lowercase output, words separated by hyphens, no special characters.\n";
+        $prompt .= "10) Stay faithful to the source: do NOT add information that is not there (delivery times, guarantees, quantities, qualities) and do NOT leave information out. Natural wording in the target language is fine.\n";
 
         if ($sourceLang !== 'auto' && $sourceLangName) {
             $prompt .= "\nSource language: {$sourceLangName}\n";
@@ -164,17 +165,76 @@ abstract class AbstractApiHelper {
     }
 
     /**
+     * True when a text has a line of its own that starts like a list number ("2. …").
+     * In a numbered answer such a line cannot be told apart from the start of the next
+     * item, so the engine sends these texts one per request.
+     *
+     * @param mixed $text
+     * @return bool
+     */
+    public static function hasNumberedLines($text)
+    {
+        return (bool) preg_match('/\n[ \t]*\d+\.(?:[ \t]|$)/m', str_replace("\r", '', (string) $text));
+    }
+
+    /**
+     * Translations of a numbered answer, keyed by 0-based item position.
+     *
      * @param string $content
      * @param int $expectedCount
      * @return array
      */
     public static function parseTranslatedItems($content, $expectedCount) {
-        $content = (string) $content;
-        if ($content === '') {
-            return [];
+        $parsed = static::parseNumberedAnswer($content, $expectedCount);
+        return $parsed['items'];
+    }
+
+    /**
+     * Read a numbered answer ("1. …", "2. …") and report how far its numbering can be trusted.
+     *
+     * Only lines numbered 1, 2, 3 … in order start an item; every other line belongs to
+     * the item before it (a translation may span several lines).
+     *
+     * - `items`    non-empty translations keyed by 0-based position
+     * - `seen`     how many items were started in order (an item with no text still counts)
+     * - `gap`      a number was skipped (… 4. 6. …). Whether that line starts item 6 or is
+     *              part of item 4 cannot be known, so item 4 is dropped and reading stops:
+     *              before this, the lines of every later item were glued onto item 4.
+     * - `overflow` the answer has more items than were sent, so an item was split in two
+     *              and every item after it sits one position too late
+     *
+     * @param string $content
+     * @param int $expectedCount
+     * @param bool $wholeAnswer  True for a single item that was sent alone because it has
+     *                           numbered lines of its own (see hasNumberedLines()).
+     * @return array{items: array, seen: int, gap: bool, overflow: bool}
+     */
+    public static function parseNumberedAnswer($content, $expectedCount, $wholeAnswer = false) {
+        $result = ['items' => [], 'seen' => 0, 'gap' => false, 'overflow' => false];
+
+        $content       = (string) $content;
+        $expectedCount = (int) $expectedCount;
+        if ($content === '' || $expectedCount < 1) {
+            return $result;
         }
 
-        $content = preg_replace('/<think>[\s\S]*?<\/think>\s*/u', '', $content);
+        $stripped = preg_replace('/<think>[\s\S]*?<\/think>\s*/u', '', $content);
+        if (is_string($stripped)) {
+            $content = $stripped;
+        }
+        $content = str_replace("\r", '', $content);
+
+        // One item with numbered lines of its own was sent alone: the whole answer belongs
+        // to it ("1. Steps:\n1. open\n2. close").
+        if ($wholeAnswer && $expectedCount === 1) {
+            $text = preg_replace('/^\s*1\.[ \t]*/', '', $content, 1);
+            $text = static::cleanupTranslatedText(trim(is_string($text) ? $text : $content));
+            if ($text !== '') {
+                $result['items'][0] = $text;
+            }
+            $result['seen'] = 1;
+            return $result;
+        }
 
         $lines = explode("\n", $content);
         $items = [];
@@ -185,12 +245,14 @@ abstract class AbstractApiHelper {
         foreach ($lines as $line) {
             if (preg_match('/^\s*(\d+)\.\s*(.*)$/', $line, $matches)) {
                 $num = (int) $matches[1];
-                $isSequential = ($num === $nextExpected && $num <= $expectedCount) || ($currentIndex === null && $num === 1);
 
-                if ($isSequential) {
+                if ($num === $nextExpected) {
+                    if ($num > $expectedCount) {
+                        $result['overflow'] = true;
+                        break;
+                    }
                     if ($currentIndex !== null) {
-                        $text = trim(implode("\n", $currentLines));
-                        $text = static::cleanupTranslatedText($text);
+                        $text = static::cleanupTranslatedText(trim(implode("\n", $currentLines)));
                         if ($text !== '') {
                             $items[$currentIndex] = $text;
                         }
@@ -198,17 +260,24 @@ abstract class AbstractApiHelper {
                     $currentIndex = $num - 1;
                     $currentLines = [$matches[2]];
                     $nextExpected = $num + 1;
-                } elseif ($currentIndex !== null) {
-                    $currentLines[] = $line;
+                    continue;
                 }
-            } elseif ($currentIndex !== null) {
+
+                if ($currentIndex !== null && $num > $nextExpected && $num <= $expectedCount) {
+                    $result['gap'] = true;
+                    $currentIndex  = null;
+                    $currentLines  = [];
+                    break;
+                }
+            }
+
+            if ($currentIndex !== null) {
                 $currentLines[] = $line;
             }
         }
 
         if ($currentIndex !== null) {
-            $text = trim(implode("\n", $currentLines));
-            $text = static::cleanupTranslatedText($text);
+            $text = static::cleanupTranslatedText(trim(implode("\n", $currentLines)));
             if ($text !== '') {
                 $items[$currentIndex] = $text;
             }
@@ -216,11 +285,10 @@ abstract class AbstractApiHelper {
 
         ksort($items);
 
-        if (count($items) !== $expectedCount) {
-            error_log(sprintf('[Rankscale AI] %s: parsed %d items but expected %d', static::engineLabel(), count($items), $expectedCount));
-        }
+        $result['items'] = $items;
+        $result['seen']  = $nextExpected - 1;
 
-        return $items;
+        return $result;
     }
 
     protected static function cleanupTranslatedText($text) {

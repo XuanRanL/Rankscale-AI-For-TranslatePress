@@ -73,7 +73,10 @@ class RetryHelper
 
     private static function isRetryableWpError($message)
     {
-        $retryable = ['timed out', 'timeout', 'reset by peer', 'connection refused', 'temporarily unavailable'];
+        // A timeout is not retried here: the call already waited its whole timeout
+        // while a visitor's page was loading, and a string that was not translated is
+        // requested again by TranslatePress on the next page load.
+        $retryable = ['reset by peer', 'connection refused', 'temporarily unavailable'];
         $lower     = strtolower($message);
         foreach ($retryable as $keyword) {
             if (strpos($lower, $keyword) !== false) {

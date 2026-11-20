@@ -4,7 +4,7 @@ namespace Rankscale\TranslatePress\AI\Base;
 
 class Common
 {
-    const PLUGIN_VERSION = '2.1.0';
+    const PLUGIN_VERSION = '2.1.1';
 
     const PLUGIN_ID = 'rankscale-ai-for-translatepress';
 

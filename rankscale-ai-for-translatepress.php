@@ -3,14 +3,14 @@
  * Plugin Name: Rankscale AI For TranslatePress
  * Plugin URI: https://rankscaleai.com
  * Description: Supercharge TranslatePress with AI-powered translation using DeepSeek, Google Gemini, and OpenAI APIs. Features optimized prompts and automatic retry.
- * Version: 2.1.0
+ * Version: 2.1.1
  * Author: Xuanran
  * Author URI: https://rankscaleai.com
  * Text Domain: rankscale-ai-for-translatepress
  * Domain Path: /languages
  * Requires PHP: 7.2
  * Requires at least: 6.0
- * Tested up to: 6.8
+ * Tested up to: 7.1
  * License: GPLv2 or later
  * License URI: http://www.gnu.org/licenses/gpl-2.0.html
  */

@@ -3,8 +3,10 @@ jQuery(function($) {
         var endpoint = $('#trp-deepseek-api-endpoint').val();
         if (endpoint === 'custom') {
             $('#trp-deepseek-custom-url-wrapper').show();
+            $('#trp-deepseek-reasoning-effort-wrapper').show();
         } else {
             $('#trp-deepseek-custom-url-wrapper').hide();
+            $('#trp-deepseek-reasoning-effort-wrapper').hide();
         }
 
         var thinkingEnabled = $('#trp-deepseek-enable-thinking').is(':checked');
